@@ -39,7 +39,7 @@ typedef NS_ENUM(NSUInteger, GFEventType) {
     GFEventTypeKeyMoved
 };
 
-typedef void (^GFQueryResultBlock) (NSString *key, CLLocation *location);
+typedef void (^GFQueryResultBlock) (NSString *key, CLLocation *location, NSTimeInterval timestamp);
 typedef void (^GFReadyBlock) ();
 
 /**

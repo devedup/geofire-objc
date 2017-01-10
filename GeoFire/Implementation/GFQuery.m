@@ -21,6 +21,7 @@
 @property (nonatomic) BOOL isInQuery;
 @property (nonatomic, strong) CLLocation *location;
 @property (nonatomic, strong) GFGeoHash *geoHash;
+@property (nonatomic, assign) NSTimeInterval timestamp;
 
 @end
 
@@ -202,9 +203,14 @@
             queryEndingAtValue:query.endValue];
 }
 
-- (void)updateLocationInfo:(CLLocation *)location
+- (void)updateLocationInfo:(FIRDataSnapshot *)snapshot
                     forKey:(NSString *)key
 {
+    
+    CLLocation *location = [GeoFire locationFromValue:snapshot.value];
+    
+    NSTimeInterval timestamp = [[snapshot.value objectForKey:@"modified"] doubleValue];
+    
     NSAssert(location != nil, @"Internal Error! Location must not be nil!");
     GFQueryLocationInfo *info = self.locationInfos[key];
     BOOL isNew = NO;
@@ -220,13 +226,14 @@
     info.location = location;
     info.isInQuery = [self locationIsInQuery:location];
     info.geoHash = [GFGeoHash newWithLocation:location.coordinate];
+    info.timestamp = timestamp;
 
     if ((isNew || !wasInQuery) && info.isInQuery) {
         [self.keyEnteredObservers enumerateKeysAndObjectsUsingBlock:^(id observerKey,
                                                                       GFQueryResultBlock block,
                                                                       BOOL *stop) {
             dispatch_async(self.geoFire.callbackQueue, ^{
-                block(key, info.location);
+                block(key, info.location, info.timestamp);
             });
         }];
     } else if (!isNew && changedLocation && info.isInQuery) {
@@ -234,7 +241,7 @@
                                                                     GFQueryResultBlock block,
                                                                     BOOL *stop) {
             dispatch_async(self.geoFire.callbackQueue, ^{
-                block(key, info.location);
+                block(key, info.location, info.timestamp);
             });
         }];
     } else if (wasInQuery && !info.isInQuery) {
@@ -242,7 +249,7 @@
                                                                      GFQueryResultBlock block,
                                                                      BOOL *stop) {
             dispatch_async(self.geoFire.callbackQueue, ^{
-                block(key, info.location);
+                block(key, info.location, info.timestamp);
             });
         }];
     }
@@ -261,24 +268,14 @@
 - (void)childAdded:(FIRDataSnapshot *)snapshot
 {
     @synchronized(self) {
-        CLLocation *location = [GeoFire locationFromValue:snapshot.value];
-        if (location != nil) {
-            [self updateLocationInfo:location forKey:snapshot.key];
-        } else {
-            // TODO: error?
-        }
+        [self updateLocationInfo:snapshot forKey:snapshot.key];
     }
 }
 
 - (void)childChanged:(FIRDataSnapshot *)snapshot
 {
     @synchronized(self) {
-        CLLocation *location = [GeoFire locationFromValue:snapshot.value];
-        if (location != nil) {
-            [self updateLocationInfo:location forKey:snapshot.key];
-        } else {
-            // TODO: error?
-        }
+        [self updateLocationInfo:snapshot forKey:snapshot.key];
     }
 }
 
@@ -292,6 +289,7 @@
                 @synchronized(self) {
                     CLLocation *location = [GeoFire locationFromValue:snapshot.value];
                     GFGeoHash *geoHash = (location) ? [[GFGeoHash alloc] initWithLocation:location.coordinate] : nil;
+                
                     // Only notify observers if key is not part of any other geohash query or this actually might not be
                     // a key exited event, but a key moved or entered event. These events will be triggered by updates
                     // to a different query
@@ -304,7 +302,7 @@
                                                                                          GFQueryResultBlock block,
                                                                                          BOOL *stop) {
                                 dispatch_async(self.geoFire.callbackQueue, ^{
-                                    block(key, location);
+                                    block(key, location, info.timestamp);
                                 });
                             }];
                         }
@@ -475,7 +473,7 @@
                                                                                 GFQueryLocationInfo *info,
                                                                                 BOOL *stop) {
                             if (info.isInQuery) {
-                                block(key, info.location);
+                                block(key, info.location, info.timestamp);
                             }
                         }];
                     };

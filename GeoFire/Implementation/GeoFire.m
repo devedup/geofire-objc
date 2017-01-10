@@ -91,7 +91,8 @@ withCompletionBlock:(GFCompletionBlock)block
         NSNumber *lat = [NSNumber numberWithDouble:location.coordinate.latitude];
         NSNumber *lng = [NSNumber numberWithDouble:location.coordinate.longitude];
         NSString *geoHash = [GFGeoHash newWithLocation:location.coordinate].geoHashValue;
-        value = @{ @"l": @[ lat, lng ], @"g": geoHash };
+        NSNumber *modified = [NSNumber numberWithDouble:[[NSDate date] timeIntervalSince1970]];
+        value = @{ @"l": @[ lat, lng ], @"g": geoHash, @"modified": modified};
         priority = geoHash;
     } else {
         value = nil;
